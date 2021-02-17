@@ -16,6 +16,11 @@
  *
  ******************************************************************************/
 
+/*
+ *  @file strooklat_inline.h
+ *  @brief Inline methods for fast linear interpolation.
+ */
+
 #ifndef STROOKLAT_SPLINE_H
 #define STROOKLAT_SPLINE_H
 
