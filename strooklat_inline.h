@@ -57,7 +57,8 @@ static inline int sorted_id(int i, int size, int ascend) {
  * @param spline The spline to be initialized
  * @param lookup_size Size of the lookup table
  */
-static int init_strooklat_spline(struct strooklat *spline, int lookup_size) {
+static inline int init_strooklat_spline(struct strooklat *spline,
+                                        int lookup_size) {
     /* Size of the x-values array */
     int size = spline->size;
 
@@ -112,7 +113,7 @@ static int init_strooklat_spline(struct strooklat *spline, int lookup_size) {
  *
  * @param spline The spline in question
  */
-static int free_strooklat_spline(struct strooklat *spline) {
+static inline int free_strooklat_spline(struct strooklat *spline) {
     free(spline->lookup.lookup_table);
     return 0;
 }
