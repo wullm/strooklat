@@ -91,7 +91,7 @@ static int init_strooklat_spline(struct strooklat *spline, int lookup_size) {
         double v = x_min + u * (x_max - x_min);
         int j;
 
-        /* Find the smallest j such that x[j-1] < v */
+        /* Find the smallest j such that x[j-1] < v and x[j] >= v */
         for (j = 0; j < size && spline->x[sorted_id(j, size, ascend)] < v; j++)
             ;
 
@@ -143,8 +143,8 @@ static inline int strooklat_find_x(struct strooklat *spline, double x, int *ind,
     }
 
     /* Quickly check the last index to see if it still works */
-    if (x >= spline->x[sorted_id(spline->last_index, size, ascend)] &&
-            x < spline->x[sorted_id(spline->last_index + 1, size, ascend)]) {
+    if (x > spline->x[sorted_id(spline->last_index, size, ascend)] &&
+            x <= spline->x[sorted_id(spline->last_index + 1, size, ascend)]) {
         *ind = spline->last_index;
     } else {
         /* Quickly find a starting index using the lookup table */
@@ -152,7 +152,7 @@ static inline int strooklat_find_x(struct strooklat *spline, double x, int *ind,
         int i = floor(w * look_size);
         int j = spline->lookup.lookup_table[i < look_size ? i : look_size - 1];
 
-        /* Find the smallest j such that spline->x[j-1] < x */
+        /* Find the smallest j such that x[j-1] < x and x[j] >= x */
         for (j = j; j < size && spline->x[sorted_id(j, size, ascend)] < x; j++)
             ;
 
