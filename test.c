@@ -17,10 +17,10 @@
  ******************************************************************************/
 
 /* Standard headers */
+#include <assert.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <sys/time.h>
 
 /* GSL interpolation library */
@@ -66,11 +66,11 @@ int main() {
         double Y1 = strooklat_interp(&spline1, y1, X1);
         double Y2 = strooklat_interp(&spline2, y2, X2);
 
-        double gslY1 = gsl_spline_eval (gsl_spline, X1, acc);
-        double gslY2 = gsl_spline_eval (gsl_spline, X2, acc);
+        double gslY1 = gsl_spline_eval(gsl_spline, X1, acc);
+        double gslY2 = gsl_spline_eval(gsl_spline, X2, acc);
 
-        double err1 = (Y1 - gslY1)/(Y1 + gslY1);
-        double err2 = (Y2 - gslY2)/(Y2 + gslY2);
+        double err1 = (Y1 - gslY1) / (Y1 + gslY1);
+        double err2 = (Y2 - gslY2) / (Y2 + gslY2);
 
         assert(fabs(err1) < 1e-6);
         assert(fabs(err2) < 1e-6);
@@ -84,38 +84,37 @@ int main() {
 
     int M = 1e8;
     double sum = 0;
-    for (int i=0; i<M; i++) {
-        double x = (double) 99 * rand()/RAND_MAX;
+    for (int i = 0; i < M; i++) {
+        double x = (double)99 * rand() / RAND_MAX;
         double Y = strooklat_interp(&spline1, y1, x);
         sum += Y;
     }
 
-    printf("Strooklat mean: %e\n", sum/M);
+    printf("Strooklat mean: %e\n", sum / M);
 
     /* End the timer */
     gettimeofday(&time_stop, NULL);
-    long unsigned microsec = (time_stop.tv_sec - time_start.tv_sec) * 1000000
-                           + time_stop.tv_usec - time_start.tv_usec;
-    printf("Strooklat time: %.5f s\n", microsec/1e6);
+    long unsigned microsec = (time_stop.tv_sec - time_start.tv_sec) * 1000000 +
+                             time_stop.tv_usec - time_start.tv_usec;
+    printf("Strooklat time: %.5f s\n", microsec / 1e6);
 
     /* Reset the timer */
     gettimeofday(&time_start, NULL);
 
     sum = 0;
-    for (int i=0; i<M; i++) {
-        double x = (double) 99 * rand()/RAND_MAX;
-        double Y = gsl_spline_eval (gsl_spline, x, acc);
+    for (int i = 0; i < M; i++) {
+        double x = (double)99 * rand() / RAND_MAX;
+        double Y = gsl_spline_eval(gsl_spline, x, acc);
         sum += Y;
     }
 
-    printf("GSL mean: %e\n", sum/M);
+    printf("GSL mean: %e\n", sum / M);
 
     /* End the timer */
     gettimeofday(&time_stop, NULL);
-    microsec = (time_stop.tv_sec - time_start.tv_sec) * 1000000
-                           + time_stop.tv_usec - time_start.tv_usec;
-    printf("GSL time: %.5f s\n", microsec/1e6);
-
+    microsec = (time_stop.tv_sec - time_start.tv_sec) * 1000000 +
+               time_stop.tv_usec - time_start.tv_usec;
+    printf("GSL time: %.5f s\n", microsec / 1e6);
 
     /* Free the splines */
     free_strooklat_spline(&spline1);
