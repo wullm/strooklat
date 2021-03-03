@@ -77,7 +77,11 @@ int init_strooklat_spline(struct strooklat *spline, int lookup_size) {
             ;
 
         /* Store the index */
-        spline->lookup.lookup_table[i] = j - 1;
+        if (j == 0) {
+            spline->lookup.lookup_table[i] = 0;
+        } else {
+            spline->lookup.lookup_table[i] = j - 1;
+        }
     }
 
     return 0;
