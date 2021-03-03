@@ -53,7 +53,7 @@ int init_strooklat_spline(struct strooklat *spline, int lookup_size) {
     spline->last_index = 0;
 
     /* Allocate the lookup table */
-    spline->lookup.lookup_table = malloc(lookup_size * sizeof(double));
+    spline->lookup.lookup_table = malloc(lookup_size * sizeof(int));
     spline->lookup.lookup_table_size = lookup_size;
 
     if (spline->lookup.lookup_table == NULL) {
