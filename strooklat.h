@@ -25,6 +25,8 @@ struct strooklat {
     const double *x;
     /* The number of data points */
     const int size;
+    /* Whether the x-array is ascending */
+    int ascend;
     /* The last index returned */
     int last_index;
 

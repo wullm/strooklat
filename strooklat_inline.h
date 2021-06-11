@@ -35,6 +35,8 @@ struct strooklat {
     const double *x;
     /* The number of data points */
     const int size;
+    /* Whether the x-array is ascending */
+    int ascend;
     /* The last index returned */
     int last_index;
 
@@ -47,7 +49,7 @@ struct strooklat {
 };
 
 /* Identity map if ascending, reverses the order if descending */
-static inline int sorted_id(int i, int size, int ascend) {
+static inline int sorted_id(const int i, const int size, const int ascend) {
     return ascend ? i : size - 1 - i;
 }
 
@@ -58,7 +60,7 @@ static inline int sorted_id(int i, int size, int ascend) {
  * @param lookup_size Size of the lookup table
  */
 static inline int init_strooklat_spline(struct strooklat *spline,
-                                        int lookup_size) {
+                                        const int lookup_size) {
     /* Size of the x-values array */
     int size = spline->size;
 
@@ -73,6 +75,9 @@ static inline int init_strooklat_spline(struct strooklat *spline,
             return 1;
         }
     }
+
+    /* Store the ascending flag */
+    spline->ascend = ascend;
 
     /* Set the cached index to a definite value */
     spline->last_index = 0;
@@ -131,13 +136,13 @@ static inline int free_strooklat_spline(struct strooklat *spline) {
  * @param ind Reference to index (output)
  * @param u Reference to ratio (output)
  */
-static inline int strooklat_find_x(struct strooklat *spline, double x, int *ind,
-                                   double *u) {
+static inline int strooklat_find_x(struct strooklat *spline, const double x,
+                                   int *ind, double *u) {
 
     /* Sizes of the lookup table and full array */
     int look_size = spline->lookup.lookup_table_size;
     int size = spline->size;
-    int ascend = (spline->x[0] < spline->x[size - 1]);
+    int ascend = spline->ascend;
 
     /* Bounding values for the x-array */
     double x_min = spline->x[sorted_id(0, size, ascend)];
@@ -192,12 +197,13 @@ static inline int strooklat_find_x(struct strooklat *spline, double x, int *ind,
  * @param ind The x-index
  * @param u The ratio u along the interval
  */
-static inline double strooklat_interp_index(struct strooklat *spline, double *y,
-        int ind, double u) {
+static inline double strooklat_interp_index(struct strooklat *spline,
+        const double *y, const int ind,
+        const double u) {
 
     /* Retrieve the bounding values */
     int size = spline->size;
-    int ascend = (spline->x[0] < spline->x[size - 1]);
+    int ascend = spline->ascend;
     double left = y[sorted_id(ind, size, ascend)];
     double right = y[sorted_id(ind + 1, size, ascend)];
 
@@ -211,8 +217,8 @@ static inline double strooklat_interp_index(struct strooklat *spline, double *y,
  * @param y The array of y values (should be same size as x)
  * @param x The x value
  */
-static inline double strooklat_interp(struct strooklat *spline, double *y,
-                                      double x) {
+static inline double strooklat_interp(struct strooklat *spline, const double *y,
+                                      const double x) {
 
     /* Find the bounding interval */
     int ind;
@@ -221,6 +227,85 @@ static inline double strooklat_interp(struct strooklat *spline, double *y,
 
     /* Interpolate the y-value */
     return strooklat_interp_index(spline, y, ind, u);
+}
+
+/**
+ * @brief Bi-linear interpolation of the z values at the given x, y values
+ *
+ * @param spline_x Spline along the x-axis
+ * @param spline_y Spline along the y-axis
+ * @param z Array of z values (should be of size N1 x N2) in row major
+ * @param x The x value
+ * @param y The y value
+ */
+static inline double strooklat_interp_2d(struct strooklat *spline_x,
+        struct strooklat *spline_y,
+        const double *z, const double x,
+        const double y) {
+
+    /* Find the bounding intervals */
+    int ind[2];
+    double u[2];
+    strooklat_find_x(spline_x, x, &ind[0], &u[0]);
+    strooklat_find_x(spline_y, y, &ind[1], &u[1]);
+
+    /* Indices of the four adjacent cells */
+    const int idx1 = sorted_id(ind[0], spline_x->size, spline_x->ascend);
+    const int idx2 = sorted_id(ind[0] + 1, spline_x->size, spline_x->ascend);
+    const int idy1 = sorted_id(ind[1], spline_y->size, spline_y->ascend);
+    const int idy2 = sorted_id(ind[1] + 1, spline_y->size, spline_y->ascend);
+
+    return (1 - u[0]) * ((1 - u[1]) * z[idy1 + spline_y->size * idx1] +
+                         u[1] * z[idy2 + spline_y->size * idx1]) +
+           u[0] * ((1 - u[1]) * z[idy1 + spline_y->size * idx2] +
+                   u[1] * z[idy2 + spline_y->size * idx2]);
+}
+
+/**
+ * @brief Multi-linear interpolation of the z values at the given (x)_i values,
+ * where i = 1, ..., dim
+ *
+ * @param dim Dimension of the argument x (such that z is a rank dim tensor)
+ * @param splines Array of dim 1-dimensional splines along each x-direction
+ * @param z Array of z values (should be of size N1 x ... x Ndim) in row major
+ * @param x Array of dim x values
+ */
+static inline double strooklat_interp_nd(const int dim,
+        struct strooklat **splines,
+        const double *z, const double *x) {
+
+    /* Find the bounding intervals */
+    int ind[dim];
+    double u[dim];
+    for (int i = 0; i < dim; i++) {
+        strooklat_find_x(splines[i], x[i], &ind[i], &u[i]);
+    }
+
+    /* We accumulate the interpolated value by iterating over adjacent cells */
+    double sum = 0;
+
+    /* We have 2^dim permutations of (1 - u_i, u_i) with i = 1, ..., dim */
+    const int perms = 1 << dim;
+
+    /* For each permutation p */
+    for (int p = 0; p < perms; p++) {
+        /* The weight is w_1 * ... * w_dim, with w_i = 1-u_i or u_i (0 or 1) */
+        double weight = 1.0;
+        /* The index of the rank dim tensor in row major format */
+        int idx = 0;
+        for (int j = 0; j < dim; j++) {
+            /* The jth bit of p: (0 = left, 1 = right) along this axis */
+            int q = (p >> j) & 1;
+            /* Update the weight */
+            weight *= q ? u[j] : (1 - u[j]);
+            /* Update the index in row major format */
+            idx *= splines[j]->size;
+            idx += sorted_id(ind[j] + q, splines[j]->size, splines[j]->ascend);
+        }
+        sum += weight * z[idx];
+    }
+
+    return sum;
 }
 
 #endif
