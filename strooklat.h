@@ -117,9 +117,8 @@ static int init_strooklat_spline(struct strooklat *spline,
  *
  * @param spline The spline in question
  */
-static int free_strooklat_spline(struct strooklat *spline) {
+static void free_strooklat_spline(struct strooklat *spline) {
     free(spline->lookup.lookup_table);
-    return 0;
 }
 
 /**
