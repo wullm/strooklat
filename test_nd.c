@@ -66,7 +66,7 @@ int main() {
     init_strooklat_spline(&spline2, 100);
 
     /* Prepare the n-dimensional interpolation */
-    struct strooklat *splines[2] = {&spline1, &spline2};
+    struct strooklat const *const splines[2] = {&spline1, &spline2};
 
     /* Initialize GSL splines to compare against */
     gsl_interp_accel *acc1 = gsl_interp_accel_alloc();

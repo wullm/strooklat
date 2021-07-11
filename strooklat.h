@@ -17,8 +17,8 @@
  ******************************************************************************/
 
 /*
- *  @file strooklat_inline.h
- *  @brief Inline methods for fast linear interpolation.
+ *  @file strooklat.h
+ *  @brief Methods for fast linear interpolation.
  */
 
 #ifndef STROOKLAT_SPLINE_H
@@ -37,8 +37,6 @@ struct strooklat {
     const int size;
     /* Whether the x-array is ascending */
     int ascend;
-    /* The last cached index */
-    int last_index;
 
     struct lookup {
         /* A lookup table for faster searches */
@@ -59,8 +57,8 @@ static inline int sorted_id(const int i, const int size, const int ascend) {
  * @param spline The spline to be initialized
  * @param lookup_size Size of the lookup table
  */
-static inline int init_strooklat_spline(struct strooklat *spline,
-                                        const int lookup_size) {
+static int init_strooklat_spline(struct strooklat *spline,
+                                 const int lookup_size) {
     /* Size of the x-values array */
     int size = spline->size;
 
@@ -78,9 +76,6 @@ static inline int init_strooklat_spline(struct strooklat *spline,
 
     /* Store the ascending flag */
     spline->ascend = ascend;
-
-    /* Set the cached index to a definite value */
-    spline->last_index = 0;
 
     /* Allocate the lookup table */
     spline->lookup.lookup_table = malloc(lookup_size * sizeof(int));
@@ -122,23 +117,22 @@ static inline int init_strooklat_spline(struct strooklat *spline,
  *
  * @param spline The spline in question
  */
-static inline int free_strooklat_spline(struct strooklat *spline) {
+static int free_strooklat_spline(struct strooklat *spline) {
     free(spline->lookup.lookup_table);
     return 0;
 }
 
 /**
- * @brief Thread-safe version of strooklat_find_x. Finds an interval containing
- * the given x-value and compute u = (x - x_left) / (x_right - x_left). Does
- * not cache the returned index.
+ * @brief Find an interval containing the given x-value and compute the
+ * ratio u = (x - x_left) / (x_right - x_left)
  *
  * @param spline The spline in question
  * @param x The x value to be located
  * @param ind Reference to index (output)
  * @param u Reference to ratio (output)
  */
-static inline void strooklat_find_x_safe(const struct strooklat *spline,
-        const double x, int *ind, double *u) {
+static inline void strooklat_find_x(const struct strooklat *const spline,
+                                    const double x, int ind[1], double u[1]) {
 
     /* Sizes of the lookup table and full array */
     int look_size = spline->lookup.lookup_table_size;
@@ -158,12 +152,8 @@ static inline void strooklat_find_x_safe(const struct strooklat *spline,
         *u = 0.0;
     }
 
-    /* Quickly check the last index to see if it still works */
-    else if (x > spline->x[sorted_id(spline->last_index, size, ascend)] &&
-             x <= spline->x[sorted_id(spline->last_index + 1, size, ascend)]) {
-        *ind = spline->last_index;
-    } else {
-        /* Quickly find a starting index using the lookup table */
+    /* Quickly find a starting index using the lookup table */
+    else {
         double w = (x - x_min) / (x_max - x_min);
         int i = floor(w * look_size);
         int j = spline->lookup.lookup_table[i < look_size ? i : look_size - 1];
@@ -185,25 +175,6 @@ static inline void strooklat_find_x_safe(const struct strooklat *spline,
 }
 
 /**
- * @brief Find an interval containing the given x-value and compute the
- * ratio u = (x - x_left) / (x_right - x_left)
- *
- * @param spline The spline in question
- * @param x The x value to be located
- * @param ind Reference to index (output)
- * @param u Reference to ratio (output)
- */
-static inline void strooklat_find_x(struct strooklat *spline, const double x,
-                                    int *ind, double *u) {
-
-    /* Thread-safe search for the index */
-    strooklat_find_x_safe(spline, x, ind, u);
-
-    /* Cache the index */
-    spline->last_index = *ind;
-}
-
-/**
  * @brief Linearly interpolate the y values given the closest x-index and the
  * ratio u = (x - x_left) / (x_right - x_left)
  *
@@ -212,9 +183,9 @@ static inline void strooklat_find_x(struct strooklat *spline, const double x,
  * @param ind The x-index
  * @param u The ratio u along the interval
  */
-static inline double strooklat_interp_index(const struct strooklat *spline,
-        const double *y, const int ind,
-        const double u) {
+static inline double
+strooklat_interp_index(const struct strooklat *const spline, const double *y,
+                       const int ind, const double u) {
 
     /* Retrieve the bounding values */
     int size = spline->size;
@@ -237,11 +208,11 @@ static inline double strooklat_interp_index(const struct strooklat *spline,
  * @param ind The x and y indices
  * @param u The ratios u along the two dimensions
  */
-static inline double strooklat_interp_index_2d(const struct strooklat *spline_x,
-        const struct strooklat *spline_y,
-        const double *z,
-        const int ind[2],
-        const double u[2]) {
+static inline double
+strooklat_interp_index_2d(const struct strooklat *const spline_x,
+                          const struct strooklat *const spline_y,
+                          const double *z, const int ind[2],
+                          const double u[2]) {
 
     /* Indices of the four adjacent cells */
     const int idx1 = sorted_id(ind[0], spline_x->size, spline_x->ascend);
@@ -266,10 +237,10 @@ static inline double strooklat_interp_index_2d(const struct strooklat *spline_x,
  * @param ind Array of dim indices ind^i
  * @param u Array of dim ratios u^i
  */
-static inline double strooklat_interp_index_nd(const int dim,
-        struct strooklat *const *splines,
-        const double *z, const int *ind,
-        const double *u) {
+static inline double
+strooklat_interp_index_nd(const int dim,
+                          const struct strooklat *const *const splines,
+                          const double *z, const int *ind, const double *u) {
 
     /* We accumulate the interpolated value by iterating over adjacent cells */
     double sum = 0;
@@ -305,33 +276,13 @@ static inline double strooklat_interp_index_nd(const int dim,
  * @param y The array of y values (should be same size as x)
  * @param x The x value
  */
-static inline double strooklat_interp(struct strooklat *spline, const double *y,
-                                      const double x) {
+static inline double strooklat_interp(struct strooklat const *spline,
+                                      const double *y, const double x) {
 
     /* Find the bounding interval */
     int ind;
     double u;
     strooklat_find_x(spline, x, &ind, &u);
-
-    /* Interpolate the y-value */
-    return strooklat_interp_index(spline, y, ind, u);
-}
-
-/**
- * @brief Thread-safe version of strooklat_interp. Linearly interpolate the
- * y values at the given x value
- *
- * @param spline The spline in question
- * @param y The array of y values (should be same size as x)
- * @param x The x value
- */
-static inline double strooklat_interp_safe(const struct strooklat *spline,
-        const double *y, const double x) {
-
-    /* Find the bounding interval */
-    int ind;
-    double u;
-    strooklat_find_x_safe(spline, x, &ind, &u);
 
     /* Interpolate the y-value */
     return strooklat_interp_index(spline, y, ind, u);
@@ -346,8 +297,8 @@ static inline double strooklat_interp_safe(const struct strooklat *spline,
  * @param x The x value
  * @param y The y value
  */
-static inline double strooklat_interp_2d(struct strooklat *spline_x,
-        struct strooklat *spline_y,
+static inline double strooklat_interp_2d(const struct strooklat *const spline_x,
+        const struct strooklat *const spline_y,
         const double *z, const double x,
         const double y) {
 
@@ -362,31 +313,6 @@ static inline double strooklat_interp_2d(struct strooklat *spline_x,
 }
 
 /**
- * @brief Thread-safe version of strooklat_interp_2d. Bi-linear interpolation
- * of the z values at the given x, y values
- *
- * @param spline_x Spline along the x-axis
- * @param spline_y Spline along the y-axis
- * @param z Array of z values (should be of size N1 x N2) in row major
- * @param x The x value
- * @param y The y value
- */
-static inline double strooklat_interp_2d_safe(const struct strooklat *spline_x,
-        const struct strooklat *spline_y,
-        const double *z, const double x,
-        const double y) {
-
-    /* Find the bounding intervals */
-    int ind[2];
-    double u[2];
-    strooklat_find_x_safe(spline_x, x, &ind[0], &u[0]);
-    strooklat_find_x_safe(spline_y, y, &ind[1], &u[1]);
-
-    /* Interpolate the z-value */
-    return strooklat_interp_index_2d(spline_x, spline_y, z, ind, u);
-}
-
-/**
  * @brief Multi-linear interpolation of the z values at the given (x)_i values,
  * where i = 1, ..., dim
  *
@@ -395,39 +321,15 @@ static inline double strooklat_interp_2d_safe(const struct strooklat *spline_x,
  * @param z Array of z values (should be of size N1 x ... x Ndim) in row major
  * @param x Array of dim x values
  */
-static inline double strooklat_interp_nd(const int dim,
-        struct strooklat **splines,
-        const double *z, const double *x) {
+static inline double
+strooklat_interp_nd(const int dim, const struct strooklat *const *const splines,
+                    const double *z, const double *x) {
 
     /* Find the bounding intervals */
     int ind[dim];
     double u[dim];
     for (int i = 0; i < dim; i++) {
         strooklat_find_x(splines[i], x[i], &ind[i], &u[i]);
-    }
-
-    return strooklat_interp_index_nd(dim, splines, z, ind, u);
-}
-
-/**
- * @brief Thread-safe version of strooklat_interp_nd. Multi-linear interpolation
- * of the z values at the given (x)_i values, where i = 1, ..., dim
- *
- * @param dim Dimension of the argument x (such that z is a rank dim tensor)
- * @param splines Array of dim 1-dimensional splines along each x-direction
- * @param z Array of z values (should be of size N1 x ... x Ndim) in row major
- * @param x Array of dim x values
- */
-static inline double strooklat_interp_nd_safe(const int dim,
-        struct strooklat *const *splines,
-        const double *z,
-        const double *x) {
-
-    /* Find the bounding intervals */
-    int ind[dim];
-    double u[dim];
-    for (int i = 0; i < dim; i++) {
-        strooklat_find_x_safe(splines[i], x[i], &ind[i], &u[i]);
     }
 
     return strooklat_interp_index_nd(dim, splines, z, ind, u);
