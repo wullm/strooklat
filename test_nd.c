@@ -28,7 +28,7 @@
 #include <gsl/gsl_spline2d.h>
 
 /* Strooklat interpolation library */
-#include "strooklat_inline.h"
+#include "strooklat.h"
 
 int main() {
     /* Allocate memory for some data points */
