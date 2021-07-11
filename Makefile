@@ -2,7 +2,7 @@
 GCC = gcc
 
 LIBRARIES = -lgsl -lgslcblas
-CFLAGS = -Wall -fopenmp -march=native -O4 -Wshadow -fPIC
+CFLAGS = -Wall -fopenmp -march=native -O4 -Wshadow -fPIC -ffast-math
 
 all:
 	# $(GCC) strooklat.c -c -o strooklat.o $(CFLAGS)
