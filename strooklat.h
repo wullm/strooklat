@@ -226,6 +226,50 @@ strooklat_interp_index_2d(const struct strooklat *const spline_x,
 }
 
 /**
+ * @brief Tri-linearly interpolate the w values given the closest indices in
+ * the x,y, and z directions and the ratios u_x, u_y, and u_z
+ *
+ * @param spline_x Spline along the x-axis
+ * @param spline_y Spline along the y-axis
+ * @param spline_z Spline along the z-axis
+ * @param w Array of w values (should be of size N1 x N2 x N3) in row major
+ * @param ind The x, y, and z indices
+ * @param u The ratios u along the three dimensions
+ */
+static inline double
+strooklat_interp_index_3d(const struct strooklat *const spline_x,
+                          const struct strooklat *const spline_y,
+                          const struct strooklat *const spline_z,
+                          const double *w, const int ind[3],
+                          const double u[3]) {
+
+    /* Indices of the four adjacent cells */
+    const int idx1 = sorted_id(ind[0], spline_x->size, spline_x->ascend);
+    const int idx2 = sorted_id(ind[0] + 1, spline_x->size, spline_x->ascend);
+    const int idy1 = sorted_id(ind[1], spline_y->size, spline_y->ascend);
+    const int idy2 = sorted_id(ind[1] + 1, spline_y->size, spline_y->ascend);
+    const int idz1 = sorted_id(ind[2], spline_z->size, spline_z->ascend);
+    const int idz2 = sorted_id(ind[2] + 1, spline_z->size, spline_z->ascend);
+
+    return (1.0 - u[0]) * (1.0 - u[1]) * (1.0 - u[2]) *
+           w[(idx1 * spline_y->size + idy1) * spline_z->size + idz1] +
+           u[0] * (1.0 - u[1]) * (1.0 - u[2]) *
+           w[(idx2 * spline_y->size + idy1) * spline_z->size + idz1] +
+           (1.0 - u[0]) * u[1] * (1.0 - u[2]) *
+           w[(idx1 * spline_y->size + idy2) * spline_z->size + idz1] +
+           u[0] * u[1] * (1.0 - u[2]) *
+           w[(idx2 * spline_y->size + idy2) * spline_z->size + idz1] +
+           (1.0 - u[0]) * (1.0 - u[1]) * u[2] *
+           w[(idx1 * spline_y->size + idy1) * spline_z->size + idz2] +
+           u[0] * (1.0 - u[1]) * u[2] *
+           w[(idx2 * spline_y->size + idy1) * spline_z->size + idz2] +
+           (1.0 - u[0]) * u[1] * u[2] *
+           w[(idx1 * spline_y->size + idy2) * spline_z->size + idz2] +
+           u[0] * u[1] * u[2] *
+           w[(idx2 * spline_y->size + idy2) * spline_z->size + idz2];
+}
+
+/**
  * @brief Multi-linearly interpolates the z value given the closest indices
  * ind^i and the ratios u^i = (x^i - x^i_left) / (x^i_right - x^i_left) along
  * the dimensions i = 1, ..., dim
@@ -309,6 +353,34 @@ static inline double strooklat_interp_2d(const struct strooklat *const spline_x,
 
     /* Interpolate the z-value */
     return strooklat_interp_index_2d(spline_x, spline_y, z, ind, u);
+}
+
+/**
+ * @brief Trii-linear interpolation of the w values at the given x, y, z values
+ *
+ * @param spline_x Spline along the x-axis
+ * @param spline_y Spline along the y-axis
+ * @param spline_z Spline along the z-axis
+ * @param w Array of w values (should be of size N1 x N2 x N3) in row major
+ * @param x The x value
+ * @param y The y value
+ * @param z The z value
+ */
+static inline double strooklat_interp_3d(const struct strooklat *const spline_x,
+        const struct strooklat *const spline_y,
+        const struct strooklat *const spline_z,
+        const double *w, const double x,
+        const double y, const double z) {
+
+    /* Find the bounding intervals */
+    int ind[3];
+    double u[3];
+    strooklat_find_x(spline_x, x, &ind[0], &u[0]);
+    strooklat_find_x(spline_y, y, &ind[1], &u[1]);
+    strooklat_find_x(spline_z, z, &ind[2], &u[2]);
+
+    /* Interpolate the z-value */
+    return strooklat_interp_index_3d(spline_x, spline_y, spline_z, w, ind, u);
 }
 
 /**
