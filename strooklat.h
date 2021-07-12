@@ -163,14 +163,14 @@ static inline void strooklat_find_x(const struct strooklat *const spline,
 
         /* We found the index */
         *ind = j - 1;
+
+        /* Find the bounding values */
+        double left = spline->x[sorted_id(*ind, size, ascend)];
+        double right = spline->x[sorted_id(*ind + 1, size, ascend)];
+
+        /* Calculate the ratio (X - X_left) / (X_right - X_left) */
+        *u = (x - left) / (right - left);
     }
-
-    /* Find the bounding values */
-    double left = spline->x[sorted_id(*ind, size, ascend)];
-    double right = spline->x[sorted_id(*ind + 1, size, ascend)];
-
-    /* Calculate the ratio (X - X_left) / (X_right - X_left) */
-    *u = (x - left) / (right - left);
 }
 
 /**
